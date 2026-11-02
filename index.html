@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <style>html{color-scheme:light dark}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
-<script src="local-db.js?v=8835bdb4"></script>
+<script src="local-db.js?v=7488f7db"></script>
 </head>
 <body>
 <title>Klientlog</title>
@@ -51,6 +51,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
+input[type=search]::-webkit-search-cancel-button{display:none}
 input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:16px;min-width:0}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 input::placeholder,textarea::placeholder{color:var(--muted);opacity:.85}
@@ -106,6 +107,13 @@ main{max-width:720px;margin:0 auto;padding-block:14px 120px;padding-left:max(16p
 
 /* client list */
 .search{width:100%}
+.searchwrap{position:relative}
+.searchwrap input{width:100%;padding-right:44px}
+.searchwrap .clr{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;font-size:18px;color:var(--muted);display:inline-flex;align-items:center;justify-content:center}
+.searchwrap .clr:hover{background:var(--surface-2);color:var(--fg)}
+.setrow input.up{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.prog{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:2px 7px;margin-left:6px}
+.prog.down{color:var(--muted);background:var(--surface-2)}
 .clist{display:flex;flex-direction:column;gap:8px}
 .citem{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;min-height:60px}
 .citem:hover{border-color:var(--accent)}
@@ -270,7 +278,7 @@ let toastT; function toast(msg){ const t=$('#toast'); t.textContent=msg; t.class
 const plural = (n,a,b) => n+' '+(n===1?a:b);
 // A trailing "+" in an exercise name is the old Numbers notation for "superset with the next exercise".
 function cleanEx(ex){
-  const o = Object.assign({}, ex); const m = /^(.*?)\s*\+\s*$/.exec(String(o.name||''));
+  const o = Object.assign({}, ex); if (o.mode!=='time' && o.mode!=='reps') delete o.mode; const m = /^(.*?)\s*\+\s*$/.exec(String(o.name||''));
   if (m){ o.name = m[1].trim(); o.superset = true; }
   o.superset = !!o.superset; return o;
 }
@@ -286,6 +294,29 @@ function groupExercises(list){
   });
   return groups;
 }
+// Time values: "45s", "1:30", "90" (in time mode) -> seconds
+function isTimeStr(v){ return /^\s*\d+\s*s\s*$/i.test(String(v||'')) || /^\s*\d+:\d{1,2}\s*$/.test(String(v||'')); }
+function toSec(v){ v = String(v||'').trim(); let m;
+  if ((m = /^(\d+):(\d{1,2})$/.exec(v))) return (+m[1])*60 + (+m[2]);
+  if ((m = /^(\d+)\s*s$/i.exec(v))) return +m[1];
+  return null; }
+function fmtTime(raw){ // digits typed on the number pad -> 45s / 1:30
+  const v = String(raw||'').trim(); if (!v || isTimeStr(v)) return v;
+  const d = v.replace(/\D/g,''); if (!d) return v;
+  if (d.length <= 2) return (+d)+'s';
+  const sec = +d.slice(-2), min = +d.slice(0,-2);
+  return sec >= 60 ? (min*60+sec)+'s' : min+':'+String(sec).padStart(2,'0'); }
+function exIsTime(ex, last){ if (ex.mode==='time') return true; if (ex.mode==='reps') return false;
+  return (ex.sets||[]).some(x=>isTimeStr(x.reps)) || !!(last && last.sets.some(x=>isTimeStr(x.reps))); }
+function repVal(v){ const t = toSec(v); return t!=null ? t : toNum(v); }
+function setBetter(cur, prev){ // true if this set beats the same set last time
+  if (!prev || !hasVal(cur)) return false;
+  const r = repVal(cur.reps), pr = repVal(prev.reps), w = toNum(cur.weight), pw = toNum(prev.weight);
+  if (w!=null && pw!=null && w > pw && (r==null || pr==null || r >= pr)) return true;
+  if (r!=null && pr!=null && r > pr && (w==null || pw==null || w >= pw)) return true;
+  return false; }
+function exVolume(sets){ let v=0, ok=false; for (const x of sets||[]){ const r=repVal(x.reps), w=toNum(x.weight); if (r!=null && w!=null && w>0){ v+=r*w; ok=true; } } return ok ? v : null; }
+function exReps(sets){ let v=0, ok=false; for (const x of sets||[]){ const r=repVal(x.reps); if (r!=null){ v+=r; ok=true; } } return ok ? v : null; }
 function programPreview(exs){ return groupExercises(exs||[]).map(g => g.items.map(x=>x.ex.name).join(' + ')).join(' · '); }
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
@@ -451,7 +482,9 @@ function renderHome(main){
     h('button',{class:'btn primary', type:'submit', disabled:S.canWrite===false}, '+ Opret'));
   main.replaceChildren(h('div',{class:'stack'},
     S.canWrite===false ? h('div',{class:'banner'},'Du kan se data, men ikke redigere.') : null,
-    h('input',{class:'search', id:'search', placeholder:'Søg klient', value:S.search, oninput:(ev)=>{ S.search=ev.target.value; const v=ev.target.value; render(); const i=$('#search'); i.focus(); i.setSelectionRange(v.length,v.length); }}),
+    h('div',{class:'searchwrap'},
+      h('input',{class:'search', id:'search', type:'search', enterkeyhint:'search', autocomplete:'off', placeholder:'Søg klient', value:S.search, oninput:(ev)=>{ S.search=ev.target.value; const v=ev.target.value; render(); const i=$('#search'); i.focus(); i.setSelectionRange(v.length,v.length); }}),
+      S.search ? h('button',{class:'clr', type:'button', 'aria-label':'Ryd søgning', onclick:()=>{ S.search=''; render(); const i=$('#search'); if (i) i.focus(); }}, '×') : null),
     list,
     nArch ? h('button',{class:'btn ghost', onclick:()=>{ S.showArchived=!S.showArchived; render(); }}, S.showArchived ? '‹ Aktive klienter' : 'Vis arkiverede ('+nArch+')') : null,
     h('div',{class:'card'}, h('h3',{style:'margin-bottom:8px;font-size:18px'},'NY KLIENT'), newForm),
@@ -566,7 +599,7 @@ async function deleteClient(){
 
 // --- tabs ---
 function tabs(){
-  const mk = (id,label)=>h('button',{class:S.tab===id?'on':'', onclick:()=>{ if (S.tab!==id) dropWork(); S.tab=id; S.menu=false; S.confirm=null; render(true); }}, label);
+  const mk = (id,label)=>h('button',{class:S.tab===id?'on':'', onclick:()=>{ if (S.tab!==id){ dropWork(); S.tab=id; S.menu=false; S.confirm=null; render(true); window.scrollTo(0,0); } }}, label);
   return h('div',{class:'tabs'}, mk('train','Træn'), mk('program','Program'), mk('history','Historik'));
 }
 
@@ -575,7 +608,8 @@ function renderDayPicker(main){
   const c = client(); const today = todayISO();
   const stack = h('div',{class:'stack'});
   if (S.menu) stack.append(clientMenu());
-  const todays = S.list.filter(s => s.date===today);
+  const CONTINUE_MS = 3*60*60*1000;
+  const todays = S.list.filter(s => s.date===today && Date.now() - (s.updatedAt || Date.parse(s.createdAt||'') || 0) < CONTINUE_MS);
   for (const s of todays){
     stack.append(h('button',{class:'daybtn today', onclick:()=>openEditor(s.id)},
       h('h3',null,'I dag · '+s.dayName), h('div',{class:'ex'}, setsSummary(s)), h('div',{class:'last link'},'Fortsæt træningen ›')));
@@ -595,21 +629,27 @@ function setsSummary(s){ return (s.exercises||[]).filter(e=>(e.sets||[]).some(ha
 function startSession(day){
   const now = Date.now();
   const s = { dayName: day.name, date: todayISO(), week:null, seq: now, imported:false, createdAt:new Date().toISOString(), note:'',
-    exercises: (day.exercises||[]).map(e => ({ name:e.name, target:e.reps||'', superset: !!e.superset, sets: Array.from({length: Math.max(1, e.sets||1)}, ()=>({reps:'',weight:''})), note:'' })) };
+    exercises: (day.exercises||[]).map(e => ({ name:e.name, target:e.reps||'', superset: !!e.superset, mode: e.mode, sets: Array.from({length: Math.max(1, e.sets||1)}, ()=>({reps:'',weight:''})), note:'' })) };
   const sid = 's'+now.toString(36);
-  S.sessions.set(sid, s); rebuildList();
-  save(spath(S.cid,sid), s, 0);
-  S.edit = { sid, s: clone(s) }; S.menu=false; S.confirm=null; S.offers=[]; S.orderOffer=false; render(true);
+  S.edit = { sid, s: clone(s), persisted:false }; S.menu=false; S.confirm=null; S.offers=[]; S.orderOffer=false; render(true);
   window.scrollTo(0,0);
 }
-function openEditor(sid){ const s = S.sessions.get(sid); if(!s) return; S.edit = { sid, s: clone(s) }; S.menu=false; S.confirm=null; S.offers=[]; S.orderOffer=false; render(true); window.scrollTo(0,0); }
+function openEditor(sid){ const s = S.sessions.get(sid); if(!s) return; S.edit = { sid, s: clone(s), persisted:true }; S.menu=false; S.confirm=null; S.offers=[]; S.orderOffer=false; render(true); window.scrollTo(0,0); }
 function closeEditor(){
   const e = S.edit; if(!e) return;
   flushAll();
-  if (!logged(e.s) && !e.s.imported){ del(spath(S.cid,e.sid)); S.sessions.delete(e.sid); rebuildList(); toast('Tom træning fjernet'); }
+  if (!meaningful(e.s) && !e.s.imported){
+    if (e.persisted){ del(spath(S.cid,e.sid)); S.sessions.delete(e.sid); rebuildList(); recomputeLast(S.cid); toast('Tom træning fjernet'); }
+  }
   S.edit=null; S.offers=[]; S.orderOffer=false; S.tab='train'; dropWork(); render(true); window.scrollTo(0,0);
 }
-function saveEdit(delay){ const e=S.edit; if(!e) return; S.sessions.set(e.sid, clone(e.s)); rebuildList(); save(spath(S.cid,e.sid), e.s, delay); touchLast(S.cid, e.s); }
+function meaningful(s){ return logged(s) || !!String(s.note||'').trim() || (s.exercises||[]).some(x=>String(x.note||'').trim()); }
+function saveEdit(delay){
+  const e=S.edit; if(!e) return;
+  if (!e.persisted && !meaningful(e.s)) return;   // nothing typed yet: keep it in memory only
+  e.persisted = true; e.s.updatedAt = Date.now();
+  S.sessions.set(e.sid, clone(e.s)); rebuildList(); save(spath(S.cid,e.sid), e.s, delay); touchLast(S.cid, e.s);
+}
 
 // --- session editor ---
 function renderEditor(main, force){
@@ -642,23 +682,39 @@ function renderEditor(main, force){
     if (S.confirm==='rmex'+i) card.append(h('div',{class:'confirm', style:'margin:6px 0'}, 'Fjern '+(ex.name||'øvelsen')+' fra denne træning?',
       h('button',{class:'btn sm danger', onclick:()=>{ s.exercises.splice(i,1); S.confirm=null; saveEdit(0); render(true); }},'Fjern'),
       h('button',{class:'btn sm', onclick:()=>{ S.confirm=null; render(true); }},'Annullér')));
+    const timeMode = exIsTime(ex, last);
     const lastEl = h('div',{class:'last'});
-    if (last) lastEl.append('Sidst (', last.when, '): ', h('b',null, setsStr(last.sets)));
+    const progEl = h('span',{class:'prog', hidden:true});
+    if (last) lastEl.append('Sidst (', last.when, '): ', h('b',null, setsStr(last.sets)), progEl);
     else lastEl.append(ex.name ? 'Ikke logget før' : '');
     if (ex.target) lastEl.append(h('span',null, ' · mål ', h('b',null, ex.target)));
     card.append(lastEl);
     const setsEl = h('div',{class:'sets'});
+    const updateProg = () => {
+      if (!last) return;
+      card.querySelectorAll('.setrow').forEach((row, j) => { const st = ex.sets[j]; const better = st && setBetter(st, last.sets[j]); row.querySelectorAll('input').forEach(i => i.classList.toggle('up', !!better)); });
+      const cv = exVolume(ex.sets), pv = exVolume(last.sets), cr = exReps(ex.sets), pr = exReps(last.sets);
+      let txt = '', down = false;
+      if (cv!=null && pv!=null && cv !== pv){ const d = Math.round(cv-pv); txt = (d>0?'▲ +':'▼ ')+d+' kg volumen'; down = d<0; }
+      else if (cv==null && cr!=null && pr!=null && cr !== pr){ const d = cr-pr; txt = (d>0?'▲ +':'▼ ')+(timeMode ? d+' sek' : d+' reps')+' i alt'; down = d<0; }
+      const done = ex.sets.filter(hasVal).length >= Math.min(ex.sets.length, last.sets.length);
+      progEl.hidden = !txt || (down && !done); progEl.textContent = txt; progEl.classList.toggle('down', down);
+    };
     ex.sets.forEach((st, j) => {
       const ph = last && last.sets[j] ? last.sets[j] : (last && last.sets.length ? last.sets[last.sets.length-1] : null);
-      const reps = h('input',{type:'text', inputmode:'decimal', value:st.reps||'', placeholder: ph ? String(ph.reps||'') : 'reps', disabled:ro, 'aria-label':'Reps sæt '+(j+1), oninput:(ev)=>{ st.reps=ev.target.value; saveEdit(); }});
-      const wt = h('input',{type:'text', inputmode:'decimal', value:st.weight||'', placeholder: ph ? String(ph.weight||'') : 'kg', disabled:ro, 'aria-label':'Vægt sæt '+(j+1), oninput:(ev)=>{ st.weight=ev.target.value; saveEdit(); }});
+      const reps = h('input',{type:'text', inputmode: timeMode ? 'numeric' : 'decimal', value:st.reps||'', placeholder: ph ? String(ph.reps||'') : (timeMode ? 'tid' : 'reps'), disabled:ro, 'aria-label':(timeMode?'Tid':'Reps')+' sæt '+(j+1),
+        oninput:(ev)=>{ st.reps=ev.target.value; saveEdit(); updateProg(); },
+        onblur: timeMode ? (ev)=>{ const f = fmtTime(ev.target.value); if (f !== ev.target.value){ ev.target.value = f; st.reps = f; saveEdit(0); updateProg(); } } : null});
+      const wt = h('input',{type:'text', inputmode:'decimal', value:st.weight||'', placeholder: ph ? String(ph.weight||'') : 'kg', disabled:ro, 'aria-label':'Vægt sæt '+(j+1), oninput:(ev)=>{ st.weight=ev.target.value; saveEdit(); updateProg(); }});
       reps.addEventListener('keydown', ev => { if (ev.key==='Enter'){ ev.preventDefault(); wt.focus(); wt.select(); } });
       wt.addEventListener('keydown', ev => { if (ev.key==='Enter'){ ev.preventDefault(); const nxt = card.querySelectorAll('.setrow input')[(j+1)*2]; if (nxt){ nxt.focus(); nxt.select(); } else wt.blur(); } });
       setsEl.append(h('div',{class:'setrow'}, h('span',{class:'idx num'}, j+1), reps, h('span',{class:'x'},'×'), wt, h('span',{class:'unit'},'kg'),
         h('button',{class:'rm', 'aria-label':'Fjern sæt', disabled:ro, onclick:()=>{ ex.sets.splice(j,1); saveEdit(0); render(true); }}, '–')));
     });
     card.append(setsEl);
+    setTimeout(updateProg, 0);
     const tools = h('div',{class:'tools'},
+      h('button',{class:'btn sm'+(timeMode?' on':''), disabled:ro, 'aria-pressed':timeMode?'true':'false', title:'Skriv tid i stedet for reps (tast f.eks. 130 for 1:30)', onclick:()=>{ ex.mode = timeMode ? 'reps' : 'time'; const day = (working().days||[]).find(d=>norm(d.name)===norm(s.dayName)); const px = day && (day.exercises||[]).find(x=>norm(x.name)===norm(ex.name)); if (px && px.mode!==ex.mode){ px.mode = ex.mode; saveClient(S.cid, 0); } saveEdit(0); render(true); }}, timeMode ? 'Tid ✓' : 'Tid'),
       h('button',{class:'btn sm', disabled:ro, onclick:()=>{ ex.sets.push({reps:'',weight:''}); saveEdit(0); render(true); setTimeout(()=>{ const ins=card.querySelectorAll('.setrow input'); const t=ins[ins.length-2]; if(t) t.focus(); },0); }}, '+ Sæt'),
       last ? h('button',{class:'btn sm', disabled:ro, onclick:()=>{ copyLast(ex, last); saveEdit(0); render(true); }}, 'Som sidst') : null,
       h('button',{class:'btn sm ghost', disabled:ro, onclick:()=>{ card.querySelector('textarea').hidden = false; card.querySelector('textarea').focus(); }}, ex.note ? 'Ret note' : 'Note'),
@@ -870,6 +926,7 @@ function renderPerExercise(stack){
 
 // ---------- routing & boot ----------
 function route(){
+  if (!S.cid) S.homeScroll = window.scrollY;
   const hsh = location.hash.replace(/^#/, '');
   const m = /^k-(.+)$/.exec(hsh);
   const cid = m ? m[1] : null;
@@ -882,6 +939,7 @@ function route(){
   }
   if (!cid) S.tab='train';
   render(true);
+  if (!cid) window.scrollTo(0, S.homeScroll||0); else window.scrollTo(0,0);
 }
 function subscribeSessions(cid){
   let timer = setTimeout(()=>{ if(!S.sessionsLoaded){ toast('Historikken er langsom at hente …'); } }, 10000);
@@ -895,7 +953,7 @@ function subscribeSessions(cid){
     // keep locally created sessions whose write is still pending
     for (const [id, s] of S.sessions) if (!next.has(id) && pending(spath(cid,id))) next.set(id, s);
     S.sessions = next; rebuildList(); S.sessionsLoaded = true;
-    if (S.edit && !S.sessions.has(S.edit.sid) && !pending(spath(cid,S.edit.sid))){ S.edit=null; toast('Træningen blev slettet et andet sted'); }
+    if (S.edit && S.edit.persisted && !S.sessions.has(S.edit.sid) && !pending(spath(cid,S.edit.sid))){ S.edit=null; toast('Træningen blev slettet et andet sted'); }
     render();
   }, err => { clearTimeout(timer); S.sessionsLoaded = true; console.error(err); toast('Kunne ikke hente historik ('+(err&&err.code||'fejl')+')'); render(); });
 }
