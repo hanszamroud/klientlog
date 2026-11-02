@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <style>html{color-scheme:light dark}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
-<script src="local-db.js?v=7488f7db"></script>
+<script src="local-db.js?v=a8426600"></script>
 </head>
 <body>
 <title>Klientlog</title>
@@ -205,6 +205,26 @@ table.ex td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-n
 .ssgroup .sslabel + .prow{border-top:0}
 .day .ssgroup{margin:8px 0;border-top:1px solid var(--line);padding-top:8px}
 .btn.on{background:var(--accent-soft);color:var(--accent)}
+.setrow .idx.pr{font-size:10px;font-weight:700;color:var(--accent-fg);background:var(--accent);border-radius:5px;text-align:center;padding:2px 0;letter-spacing:.03em}
+.prbadge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--accent-fg);background:var(--accent);border-radius:5px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.tile .k{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .d{font-size:13px;color:var(--muted)}
+.tile .d.up{color:var(--accent);font-weight:600}
+.sumhead h2{font-size:30px;text-transform:uppercase}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 6px 4px}
+.chart svg{display:block;width:100%;height:auto}
+.chart .ax{fill:var(--muted);font-size:11px;font-family:var(--font-body)}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .ln{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.chart .ar{fill:var(--accent);opacity:.12}
+.chart .dot{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.chart .dot.pr{fill:var(--accent)}
+.chart .end{fill:var(--accent)}
+.chart .endlbl{fill:var(--fg);font-size:12px;font-weight:600;font-family:var(--font-body)}
+@media (min-width:600px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
 .toast.show{opacity:1}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
@@ -317,6 +337,46 @@ function setBetter(cur, prev){ // true if this set beats the same set last time
   return false; }
 function exVolume(sets){ let v=0, ok=false; for (const x of sets||[]){ const r=repVal(x.reps), w=toNum(x.weight); if (r!=null && w!=null && w>0){ v+=r*w; ok=true; } } return ok ? v : null; }
 function exReps(sets){ let v=0, ok=false; for (const x of sets||[]){ const r=repVal(x.reps); if (r!=null){ v+=r; ok=true; } } return ok ? v : null; }
+function e1rm(st){ const r = toNum(st.reps), w = toNum(st.weight); if (r==null || w==null || w<=0 || r<1 || r>12 || isTimeStr(st.reps)) return null; return r===1 ? w : w*(1+r/30); }
+// All-time bests for an exercise from sessions before `beforeSeq` (excluding one session id).
+function bestsFor(name, beforeSeq, excludeId){
+  const key = norm(name); const b = { n:0, w:null, r:null, rm:null, vol:null };
+  for (const s of S.list){
+    if (s.id===excludeId || (beforeSeq!=null && (s.seq||0) >= beforeSeq)) continue;
+    const e = (s.exercises||[]).find(x => norm(x.name)===key); if (!e) continue;
+    const sets = (e.sets||[]).filter(hasVal); if (!sets.length) continue; b.n++;
+    for (const st of sets){
+      const w = toNum(st.weight), r = repVal(st.reps), rm = e1rm(st);
+      if (w!=null && w>0 && (b.w==null || w>b.w)) b.w = w;
+      if (r!=null && (w==null || w<=0) && (b.r==null || r>b.r)) b.r = r;
+      if (rm!=null && (b.rm==null || rm>b.rm)) b.rm = rm;
+    }
+    const v = exVolume(sets); if (v!=null && (b.vol==null || v>b.vol)) b.vol = v;
+  }
+  return b;
+}
+// Which records does this exercise entry set? Returns {sets:[label|null], list:[text]}
+function recordsFor(ex, best, timeMode){
+  const out = { sets: [], list: [] }; if (!best || !best.n) return out;
+  let topW = best.w, topR = best.r, topRm = best.rm; let gotW=false, gotR=false, gotRm=false;
+  (ex.sets||[]).forEach((st, j) => {
+    out.sets[j] = null; if (!hasVal(st)) return;
+    const w = toNum(st.weight), r = repVal(st.reps), rm = e1rm(st);
+    if (w!=null && w>0 && topW!=null && w>topW){ topW = w; gotW = true; out.sets[j] = 'PR'; }
+    else if (rm!=null && topRm!=null && rm>topRm+0.01){ topRm = rm; gotRm = true; out.sets[j] = 'PR'; }
+    else if (r!=null && (w==null || w<=0) && topR!=null && r>topR){ topR = r; gotR = true; out.sets[j] = 'PR'; }
+    if (w!=null && w>0 && topW!=null && w>topW) topW = w;
+    if (rm!=null && topRm!=null && rm>topRm) topRm = rm;
+    if (r!=null && (w==null || w<=0) && topR!=null && r>topR) topR = r;
+  });
+  if (gotW) out.list.push('tungeste sæt '+fmtNum(topW)+' kg');
+  if (gotRm && !gotW) out.list.push('bedste est. 1RM '+fmtNum(Math.round(topRm*10)/10)+' kg');
+  if (gotR) out.list.push(timeMode ? 'længste tid '+fmtSec(topR) : 'flest reps '+topR);
+  const v = exVolume((ex.sets||[]).filter(hasVal)); if (v!=null && best.vol!=null && v>best.vol) out.list.push('største volumen '+fmtNum(Math.round(v))+' kg');
+  return out;
+}
+function fmtNum(n){ return String(n).replace('.', ','); }
+function fmtSec(t){ return t>=60 ? Math.floor(t/60)+':'+String(t%60).padStart(2,'0') : t+'s'; }
 function programPreview(exs){ return groupExercises(exs||[]).map(g => g.items.map(x=>x.ex.name).join(' + ')).join(' · '); }
 const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
@@ -326,7 +386,7 @@ const S = {
   clients:new Map(), clientsLoaded:false, work:{},
   cid:null, tab:'train', sessions:new Map(), list:[], sessionsLoaded:false, unsub:null,
   edit:null, mounted:null, confirm:null, offers:[], orderOffer:false,
-  histMode:'sessions', histEx:'', expanded:new Set(), search:'', showArchived:false, menu:false
+  histMode:'sessions', histEx:'', histMetric:'', summary:null, expanded:new Set(), search:'', showArchived:false, menu:false
 };
 const cpath = cid => 'clients/'+cid;
 const spath = (cid, sid) => 'clients/'+cid+'/sessions/'+sid;
@@ -447,7 +507,8 @@ function render(force){
   const c = client();
   if (!c){ S.mounted=null; main.replaceChildren(h('div',{class:'empty'}, h('h2',null,'Klienten findes ikke'), h('button',{class:'btn', onclick:()=>{ location.hash='home'; }}, 'Til klientlisten'))); return; }
   if (S.edit){ renderEditor(main, force); return; }
-  if (S.tab==='train') { S.mounted=null; renderDayPicker(main); }
+  if (S.summary) { S.mounted=null; renderSummary(main); }
+  else if (S.tab==='train') { S.mounted=null; renderDayPicker(main); }
   else if (S.tab==='program') renderProgram(main, force);
   else { S.mounted=null; renderHistory(main); }
 }
@@ -456,7 +517,7 @@ function renderTop(){
   const status = h('span',{class:'status'+(S.statusKind==='error'?' err':''), id:'status'}, S.statusKind==='pending' ? 'Gemmer …' : S.statusKind==='saved' ? 'Gemt' : S.statusKind==='error' ? 'Ikke gemt' : '');
   const top = $('.top'); if (top) top.hidden = !c;
   if (!c){ bar.replaceChildren(h('h1',{class:'brand'},'Klientlog'), status); return; }
-  const back = h('button',{class:'back', onclick:()=>{ if (S.edit){ closeEditor(); } else { location.hash='home'; } }}, '‹ ', S.edit ? 'Dage' : 'Klienter');
+  const back = h('button',{class:'back', onclick:()=>{ if (S.edit){ closeEditor(); } else if (S.summary){ S.summary=null; render(true); } else { location.hash='home'; } }}, '‹ ', S.edit || S.summary ? 'Dage' : 'Klienter');
   const title = h('h1',null, c.name);
   const menuBtn = h('button',{class:'iconbtn', 'aria-label':'Klientmenu', onclick:()=>{ S.menu=!S.menu; S.confirm=null; render(true); }}, '⋯');
   bar.replaceChildren(back, title, status, menuBtn);
@@ -598,8 +659,69 @@ async function deleteClient(){
 }
 
 // --- tabs ---
+function summaryData(sid, s){
+  const prevSame = S.list.find(x => x.id!==sid && (x.seq||0) < (s.seq||0) && norm(x.dayName)===norm(s.dayName) && logged(x));
+  let vol = 0, volPrev = 0, sets = 0, prs = [];
+  const rows = [];
+  for (const ex of s.exercises||[]){
+    const done = (ex.sets||[]).filter(hasVal); if (!done.length) continue;
+    sets += done.length; const v = exVolume(done) || 0; vol += v;
+    const last = lastFor(ex.name, s.seq, sid); const lv = last ? (exVolume(last.sets)||0) : 0;
+    if (prevSame && last && last.s.id===prevSame.id) volPrev += lv;
+    const tm = exIsTime(ex, last); const recs = recordsFor(ex, bestsFor(ex.name, s.seq, sid), tm);
+    if (recs.list.length) prs.push({ name: ex.name, list: recs.list });
+    rows.push({ ex, done, last, recs, delta: last && v && lv ? Math.round(v - lv) : null });
+  }
+  const start = Date.parse(s.createdAt||''), end = s.updatedAt || 0;
+  const mins = start && end && end - start >= 60000 ? Math.round((end - start)/60000) : null;
+  return { rows, vol: Math.round(vol), volPrev: Math.round(volPrev), prevSame, sets, prs, mins };
+}
+function summaryText(c, s, d){
+  const lines = [c.name+' · '+(s.dayName||'Træning')+(s.date ? ' · '+fmtDate(s.date, true) : '')];
+  for (const r of d.rows){ lines.push(r.ex.name+': '+setsStr(r.done)+(r.recs.list.length ? '  (PR: '+r.recs.list.join(', ')+')' : '')); }
+  lines.push('');
+  if (d.vol) lines.push('Volumen: '+d.vol.toLocaleString('da-DK')+' kg'+(d.prevSame && d.volPrev ? ' ('+(d.vol-d.volPrev>=0?'+':'')+(d.vol-d.volPrev).toLocaleString('da-DK')+' kg mod sidst)' : ''));
+  lines.push('Sæt: '+d.sets+(d.mins ? ' · Tid: '+d.mins+' min' : ''));
+  if (d.prs.length) lines.push('Nye rekorder: '+d.prs.length);
+  return lines.join('\n');
+}
+function renderSummary(main){
+  const c = client(); const { sid, s } = S.summary; const d = summaryData(sid, s);
+  const tile = (k, v, sub, up) => h('div',{class:'tile'}, h('div',{class:'k'}, k), h('div',{class:'v'}, v), sub ? h('div',{class:'d'+(up?' up':'')}, sub) : null);
+  const dv = d.prevSame && d.volPrev ? d.vol - d.volPrev : null;
+  const stack = h('div',{class:'stack'},
+    h('div',{class:'sumhead'}, h('div',{class:'small muted'}, 'Træning gemt · '+(s.date ? fmtDate(s.date, true) : '')), h('h2',null, s.dayName||'Træning')),
+    h('div',{class:'tiles'},
+      tile('Volumen', d.vol ? d.vol.toLocaleString('da-DK')+' kg' : '–', dv!=null ? (dv>=0?'▲ +':'▼ ')+dv.toLocaleString('da-DK')+' kg mod sidst' : null, dv!=null && dv>0),
+      tile('Sæt', String(d.sets), plural(d.rows.length,'øvelse','øvelser')),
+      tile('Tid', d.mins!=null ? d.mins+' min' : '–', null),
+      tile('Rekorder', String(d.prs.length), d.prs.length ? 'nye PR i dag' : 'ingen i dag', d.prs.length>0)));
+  if (d.prs.length){
+    const box = h('div',{class:'card stack', style:'gap:6px'}, h('h3',{style:'font-size:18px'}, 'NYE REKORDER'));
+    for (const p of d.prs) box.append(h('div',null, h('b',null, p.name), h('span',{class:'muted'}, ' · '+p.list.join(', '))));
+    stack.append(box);
+  }
+  const list = h('div',{class:'card'});
+  for (const r of d.rows){
+    list.append(h('div',{class:'hex'},
+      h('span',{class:'n'}, r.ex.name, r.recs.list.length ? h('span',{class:'prbadge'},'PR') : null),
+      h('span',{class:'s'}, setsStr(r.done)),
+      r.delta ? h('span',{class:'nt', style: r.delta>0 ? 'color:var(--accent);font-weight:600' : ''}, (r.delta>0?'▲ +':'▼ ')+r.delta+' kg volumen mod sidst') : null));
+  }
+  stack.append(list);
+  const text = summaryText(c, s, d);
+  const shareBtn = h('button',{class:'btn primary', onclick: async ()=>{
+    try { if (navigator.share && S.local){ await navigator.share({ text }); return; } } catch(err){ if (err && err.name==='AbortError') return; }
+    try { await navigator.clipboard.writeText(text); toast('Kopieret. Indsæt i en besked til '+c.name); }
+    catch(err){ const ta = $('#sumtext'); ta.hidden = false; ta.focus(); ta.select(); toast('Markér og kopiér teksten'); }
+  }}, S.local ? 'Del med klient' : 'Kopiér til klient');
+  stack.append(h('div',{class:'row'}, shareBtn, h('button',{class:'btn', onclick:()=>{ S.summary=null; render(true); window.scrollTo(0,0); }}, 'Luk')));
+  stack.append(h('textarea',{id:'sumtext', hidden:true, readonly:true, style:'width:100%;min-height:160px'}, text));
+  stack.append(h('button',{class:'btn ghost', onclick:()=>{ const x = S.summary; S.summary=null; openEditor(x.sid); }}, 'Ret træningen'));
+  main.replaceChildren(stack);
+}
 function tabs(){
-  const mk = (id,label)=>h('button',{class:S.tab===id?'on':'', onclick:()=>{ if (S.tab!==id){ dropWork(); S.tab=id; S.menu=false; S.confirm=null; render(true); window.scrollTo(0,0); } }}, label);
+  const mk = (id,label)=>h('button',{class:S.tab===id?'on':'', onclick:()=>{ if (S.tab!==id || S.summary){ S.summary=null; dropWork(); S.tab=id; S.menu=false; S.confirm=null; render(true); window.scrollTo(0,0); } }}, label);
   return h('div',{class:'tabs'}, mk('train','Træn'), mk('program','Program'), mk('history','Historik'));
 }
 
@@ -641,6 +763,8 @@ function closeEditor(){
   if (!meaningful(e.s) && !e.s.imported){
     if (e.persisted){ del(spath(S.cid,e.sid)); S.sessions.delete(e.sid); rebuildList(); recomputeLast(S.cid); toast('Tom træning fjernet'); }
   }
+  const showSummary = logged(e.s) && !e.s.imported;
+  S.summary = showSummary ? { sid: e.sid, s: clone(e.s) } : null;
   S.edit=null; S.offers=[]; S.orderOffer=false; S.tab='train'; dropWork(); render(true); window.scrollTo(0,0);
 }
 function meaningful(s){ return logged(s) || !!String(s.note||'').trim() || (s.exercises||[]).some(x=>String(x.note||'').trim()); }
@@ -683,6 +807,7 @@ function renderEditor(main, force){
       h('button',{class:'btn sm danger', onclick:()=>{ s.exercises.splice(i,1); S.confirm=null; saveEdit(0); render(true); }},'Fjern'),
       h('button',{class:'btn sm', onclick:()=>{ S.confirm=null; render(true); }},'Annullér')));
     const timeMode = exIsTime(ex, last);
+    const best = bestsFor(ex.name, s.seq, e.sid);
     const lastEl = h('div',{class:'last'});
     const progEl = h('span',{class:'prog', hidden:true});
     if (last) lastEl.append('Sidst (', last.when, '): ', h('b',null, setsStr(last.sets)), progEl);
@@ -691,6 +816,8 @@ function renderEditor(main, force){
     card.append(lastEl);
     const setsEl = h('div',{class:'sets'});
     const updateProg = () => {
+      const recs = recordsFor(ex, best, timeMode);
+      card.querySelectorAll('.setrow').forEach((row, j) => { const idx = row.querySelector('.idx'); const pr = recs.sets[j]; idx.classList.toggle('pr', !!pr); idx.textContent = pr ? 'PR' : String(j+1); idx.title = pr ? 'Ny rekord' : ''; });
       if (!last) return;
       card.querySelectorAll('.setrow').forEach((row, j) => { const st = ex.sets[j]; const better = st && setBetter(st, last.sets[j]); row.querySelectorAll('input').forEach(i => i.classList.toggle('up', !!better)); });
       const cv = exVolume(ex.sets), pv = exVolume(last.sets), cr = exReps(ex.sets), pr = exReps(last.sets);
@@ -920,9 +1047,51 @@ function renderPerExercise(stack){
     tb.append(h('tr',null, h('td',null, s.date ? fmtDate(s.date, true) : 'Uge '+s.week, h('div',{class:'small muted'}, s.dayName)), h('td',{class:'num'}, setsStr(e.sets)), h('td',{class:'r'}, v!=null ? Math.round(v)+' kg' : '–')));
   }
   tbl.append(tb);
-  stack.append(h('div',{class:'small muted'}, rows.length+' gange logget', isFinite(best) && best>-Infinity ? ' · tungeste sæt '+best+' kg' : ''));
+  stack.append(h('div',{class:'small muted'}, rows.length+' gange logget', isFinite(best) && best>-Infinity ? ' · tungeste sæt '+fmtNum(best)+' kg' : ''));
+  const chrono = rows.slice().reverse();
+  const tm = chrono.some(({e}) => e.mode==='time' || (e.sets||[]).some(x=>isTimeStr(x.reps)));
+  const hasW = chrono.some(({e}) => e.sets.some(x => (toNum(x.weight)||0) > 0));
+  const metrics = hasW
+    ? [['top','Tungeste sæt', e => { let m=null; for (const x of e.sets.filter(hasVal)){ const w=toNum(x.weight); if (w!=null && (m==null||w>m)) m=w; } return m; }, ' kg'],
+       ['rm','Est. 1RM', e => { let m=null; for (const x of e.sets.filter(hasVal)){ const v=e1rm(x); if (v!=null && (m==null||v>m)) m=v; } return m!=null ? Math.round(m*10)/10 : null; }, ' kg'],
+       ['vol','Volumen', e => { const v = exVolume(e.sets.filter(hasVal)); return v!=null ? Math.round(v) : null; }, ' kg']]
+    : [['reps', tm ? 'Længste tid' : 'Flest reps', e => { let m=null; for (const x of e.sets.filter(hasVal)){ const r=repVal(x.reps); if (r!=null && (m==null||r>m)) m=r; } return m; }, tm ? ' s' : ''],
+       ['tot', tm ? 'Tid i alt' : 'Reps i alt', e => exReps(e.sets.filter(hasVal)), tm ? ' s' : '']];
+  if (!metrics.some(m => m[0]===S.histMetric)) S.histMetric = metrics[0][0];
+  const metric = metrics.find(m => m[0]===S.histMetric);
+  stack.append(h('div',{class:'seg', style:'align-self:flex-start;flex-wrap:wrap'}, metrics.map(m => h('button',{class:m[0]===S.histMetric?'on':'', onclick:()=>{ S.histMetric=m[0]; render(); }}, m[1]))));
+  const pts = chrono.map(({s,e}) => ({ v: metric[2](e), label: s.date ? (parseISO(s.date).getDate()+'/'+(parseISO(s.date).getMonth()+1)) : 'u'+s.week })).filter(p => p.v!=null);
+  if (pts.length >= 2) stack.append(lineChart(pts, metric[3]));
+  else stack.append(h('div',{class:'small muted'}, 'Grafen kommer når øvelsen er logget mindst to gange.'));
   stack.append(h('div',{class:'tablewrap'}, tbl));
 }
+
+function lineChart(pts, unit){
+  const W = 360, H = 190, L = 34, R = 8, T = 18, B = 22;
+  const vals = pts.map(p=>p.v); let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (lo === hi){ lo -= 1; hi += 1; }
+  const step = niceStep((hi - lo) / 4); lo = Math.floor(lo/step)*step; hi = Math.ceil(hi/step)*step;
+  const x = i => L + (pts.length===1 ? 0 : i*(W-L-R)/(pts.length-1));
+  const y = v => T + (hi - v)*(H-T-B)/(hi - lo);
+  const ns = 'http://www.w3.org/2000/svg'; const el = (t, a, txt) => { const n = document.createElementNS(ns, t); for (const k in a) n.setAttribute(k, a[k]); if (txt!=null) n.textContent = txt; return n; };
+  const svg = el('svg', { viewBox:'0 0 '+W+' '+H, role:'img', 'aria-label':'Udvikling over tid' });
+  for (let v = lo; v <= hi + 1e-9; v += step){
+    svg.appendChild(el('line', { class:'grid', x1:L, x2:W-R, y1:y(v), y2:y(v) }));
+    svg.appendChild(el('text', { class:'ax', x:L-5, y:y(v)+4, 'text-anchor':'end' }, fmtNum(Math.round(v*10)/10)));
+  }
+  const every = Math.max(1, Math.ceil(pts.length / 5));
+  pts.forEach((p, i) => { if (i % every === 0 || i === pts.length-1) svg.appendChild(el('text', { class:'ax', x:x(i), y:H-5, 'text-anchor': i===0 ? 'start' : i===pts.length-1 ? 'end' : 'middle' }, p.label)); });
+  const d = pts.map((p,i) => (i?'L':'M')+x(i).toFixed(1)+' '+y(p.v).toFixed(1)).join(' ');
+  svg.appendChild(el('path', { class:'ar', d: d+' L'+x(pts.length-1).toFixed(1)+' '+(H-B)+' L'+L+' '+(H-B)+' Z' }));
+  svg.appendChild(el('path', { class:'ln', d }));
+  let run = -Infinity;
+  pts.forEach((p, i) => { const pr = p.v > run && i > 0; if (p.v > run) run = p.v; if (i < pts.length-1 && pts.length <= 40) svg.appendChild(el('circle', { class:'dot'+(pr?' pr':''), cx:x(i), cy:y(p.v), r: 3.5 })); });
+  const lp = pts[pts.length-1];
+  svg.appendChild(el('circle', { class:'end', cx:x(pts.length-1), cy:y(lp.v), r:5.5 }));
+  svg.appendChild(el('text', { class:'endlbl', x:x(pts.length-1), y: y(lp.v) - 12 < T + 4 ? y(lp.v) + 20 : y(lp.v) - 12, 'text-anchor':'end' }, fmtNum(lp.v)+unit));
+  return h('div',{class:'chart'}, svg);
+}
+function niceStep(raw){ const p = Math.pow(10, Math.floor(Math.log10(raw||1))); const f = raw/p; return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p; }
 
 // ---------- routing & boot ----------
 function route(){
@@ -933,7 +1102,7 @@ function route(){
   if (cid !== S.cid){
     if (S.unsub){ S.unsub(); S.unsub=null; }
     flushAll(); dropWork(S.cid);
-    S.cid = cid; S.sessions = new Map(); S.list=[]; S.sessionsLoaded=false; S.edit=null; S.offers=[]; S.orderOffer=false; S.menu=false; S.confirm=null; S.expanded=new Set(); S.histEx='';
+    S.cid = cid; S.sessions = new Map(); S.list=[]; S.sessionsLoaded=false; S.edit=null; S.summary=null; S.offers=[]; S.orderOffer=false; S.menu=false; S.confirm=null; S.expanded=new Set(); S.histEx='';
     if (cid && S.tab!=='program') S.tab = 'train';
     if (cid && S.db) subscribeSessions(cid);
   }

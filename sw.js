@@ -1,5 +1,5 @@
-const CACHE = 'klientlog-7488f7db';
-const SHELL = ['./', './index.html', './local-db.js?v=7488f7db', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
+const CACHE = 'klientlog-a8426600';
+const SHELL = ['./', './index.html', './local-db.js?v=a8426600', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
