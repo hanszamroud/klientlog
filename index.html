@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <style>html{color-scheme:light dark}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
-<script src="local-db.js?v=a8426600"></script>
+<script src="local-db.js?v=513336ac"></script>
 </head>
 <body>
 <title>Klientlog</title>
@@ -154,6 +154,7 @@ main{max-width:720px;margin:0 auto;padding-block:14px 120px;padding-left:max(16p
 .setrow .rm:hover{background:var(--danger-soft);color:var(--danger)}
 .exercise .tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .exercise textarea{width:100%;margin-top:8px;min-height:56px;resize:vertical}
+.exercise textarea.sticky{margin:0 0 10px;min-height:44px;background:var(--warn-soft);border-color:transparent;font-size:15px}
 .exercise .note-text{font-size:14px;margin-top:8px;color:var(--muted);white-space:pre-wrap}
 .actionbar{position:fixed;left:0;right:0;bottom:0;z-index:8;background:var(--surface);border-top:1px solid var(--line);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
@@ -326,6 +327,12 @@ function fmtTime(raw){ // digits typed on the number pad -> 45s / 1:30
   if (d.length <= 2) return (+d)+'s';
   const sec = +d.slice(-2), min = +d.slice(0,-2);
   return sec >= 60 ? (min*60+sec)+'s' : min+':'+String(sec).padStart(2,'0'); }
+function exIsAssist(ex, last){ if (ex.assist===true) return true; if (ex.assist===false) return false;
+  return (ex.sets||[]).some(x=>(toNum(x.weight)||0)<0) || !!(last && last.sets.some(x=>(toNum(x.weight)||0)<0)); }
+function asNeg(v){ v = String(v||'').trim(); if (!v) return v; const d = v.replace(/^[-−–\s]+/, ''); return d ? '-'+d : ''; }
+function programEx(name){ const k = norm(name); for (const d of (working().days||[])) for (const x of d.exercises||[]) if (norm(x.name)===k) return x; return null; }
+function lastNoteFor(name){ const k = norm(name); for (const s of S.list){ const e = (s.exercises||[]).find(x=>norm(x.name)===k && String(x.note||'').trim()); if (e) return e.note; } return ''; }
+function stickyFor(name){ const px = programEx(name); return (px && String(px.note||'').trim()) ? px.note : lastNoteFor(name); }
 function exIsTime(ex, last){ if (ex.mode==='time') return true; if (ex.mode==='reps') return false;
   return (ex.sets||[]).some(x=>isTimeStr(x.reps)) || !!(last && last.sets.some(x=>isTimeStr(x.reps))); }
 function repVal(v){ const t = toSec(v); return t!=null ? t : toNum(v); }
@@ -347,8 +354,8 @@ function bestsFor(name, beforeSeq, excludeId){
     const sets = (e.sets||[]).filter(hasVal); if (!sets.length) continue; b.n++;
     for (const st of sets){
       const w = toNum(st.weight), r = repVal(st.reps), rm = e1rm(st);
-      if (w!=null && w>0 && (b.w==null || w>b.w)) b.w = w;
-      if (r!=null && (w==null || w<=0) && (b.r==null || r>b.r)) b.r = r;
+      if (w!=null && w!==0 && (b.w==null || w>b.w)) b.w = w;
+      if (r!=null && (w==null || w===0) && (b.r==null || r>b.r)) b.r = r;
       if (rm!=null && (b.rm==null || rm>b.rm)) b.rm = rm;
     }
     const v = exVolume(sets); if (v!=null && (b.vol==null || v>b.vol)) b.vol = v;
@@ -362,14 +369,14 @@ function recordsFor(ex, best, timeMode){
   (ex.sets||[]).forEach((st, j) => {
     out.sets[j] = null; if (!hasVal(st)) return;
     const w = toNum(st.weight), r = repVal(st.reps), rm = e1rm(st);
-    if (w!=null && w>0 && topW!=null && w>topW){ topW = w; gotW = true; out.sets[j] = 'PR'; }
+    if (w!=null && w!==0 && topW!=null && w>topW){ topW = w; gotW = true; out.sets[j] = 'PR'; }
     else if (rm!=null && topRm!=null && rm>topRm+0.01){ topRm = rm; gotRm = true; out.sets[j] = 'PR'; }
-    else if (r!=null && (w==null || w<=0) && topR!=null && r>topR){ topR = r; gotR = true; out.sets[j] = 'PR'; }
-    if (w!=null && w>0 && topW!=null && w>topW) topW = w;
+    else if (r!=null && (w==null || w===0) && topR!=null && r>topR){ topR = r; gotR = true; out.sets[j] = 'PR'; }
+    if (w!=null && w!==0 && topW!=null && w>topW) topW = w;
     if (rm!=null && topRm!=null && rm>topRm) topRm = rm;
-    if (r!=null && (w==null || w<=0) && topR!=null && r>topR) topR = r;
+    if (r!=null && (w==null || w===0) && topR!=null && r>topR) topR = r;
   });
-  if (gotW) out.list.push('tungeste sæt '+fmtNum(topW)+' kg');
+  if (gotW) out.list.push(topW < 0 ? 'mindst assistance '+fmtNum(topW)+' kg' : 'tungeste sæt '+fmtNum(topW)+' kg');
   if (gotRm && !gotW) out.list.push('bedste est. 1RM '+fmtNum(Math.round(topRm*10)/10)+' kg');
   if (gotR) out.list.push(timeMode ? 'længste tid '+fmtSec(topR) : 'flest reps '+topR);
   const v = exVolume((ex.sets||[]).filter(hasVal)); if (v!=null && best.vol!=null && v>best.vol) out.list.push('største volumen '+fmtNum(Math.round(v))+' kg');
@@ -751,7 +758,7 @@ function setsSummary(s){ return (s.exercises||[]).filter(e=>(e.sets||[]).some(ha
 function startSession(day){
   const now = Date.now();
   const s = { dayName: day.name, date: todayISO(), week:null, seq: now, imported:false, createdAt:new Date().toISOString(), note:'',
-    exercises: (day.exercises||[]).map(e => ({ name:e.name, target:e.reps||'', superset: !!e.superset, mode: e.mode, sets: Array.from({length: Math.max(1, e.sets||1)}, ()=>({reps:'',weight:''})), note:'' })) };
+    exercises: (day.exercises||[]).map(e => ({ name:e.name, target:e.reps||'', superset: !!e.superset, mode: e.mode, assist: e.assist, sets: Array.from({length: Math.max(1, e.sets||1)}, ()=>({reps:'',weight:''})), note: stickyFor(e.name) || '' })) };
   const sid = 's'+now.toString(36);
   S.edit = { sid, s: clone(s), persisted:false }; S.menu=false; S.confirm=null; S.offers=[]; S.orderOffer=false; render(true);
   window.scrollTo(0,0);
@@ -767,7 +774,7 @@ function closeEditor(){
   S.summary = showSummary ? { sid: e.sid, s: clone(e.s) } : null;
   S.edit=null; S.offers=[]; S.orderOffer=false; S.tab='train'; dropWork(); render(true); window.scrollTo(0,0);
 }
-function meaningful(s){ return logged(s) || !!String(s.note||'').trim() || (s.exercises||[]).some(x=>String(x.note||'').trim()); }
+function meaningful(s){ return logged(s) || !!String(s.note||'').trim() || (s.exercises||[]).some(x=>String(x.note||'').trim() && String(x.note||'').trim() !== String(stickyFor(x.name)||'').trim()); }
 function saveEdit(delay){
   const e=S.edit; if(!e) return;
   if (!e.persisted && !meaningful(e.s)) return;   // nothing typed yet: keep it in memory only
@@ -807,6 +814,7 @@ function renderEditor(main, force){
       h('button',{class:'btn sm danger', onclick:()=>{ s.exercises.splice(i,1); S.confirm=null; saveEdit(0); render(true); }},'Fjern'),
       h('button',{class:'btn sm', onclick:()=>{ S.confirm=null; render(true); }},'Annullér')));
     const timeMode = exIsTime(ex, last);
+    const assist = exIsAssist(ex, last);
     const best = bestsFor(ex.name, s.seq, e.sid);
     const lastEl = h('div',{class:'last'});
     const progEl = h('span',{class:'prog', hidden:true});
@@ -814,6 +822,7 @@ function renderEditor(main, force){
     else lastEl.append(ex.name ? 'Ikke logget før' : '');
     if (ex.target) lastEl.append(h('span',null, ' · mål ', h('b',null, ex.target)));
     card.append(lastEl);
+    const noteSlot = h('div'); card.append(noteSlot);
     const setsEl = h('div',{class:'sets'});
     const updateProg = () => {
       const recs = recordsFor(ex, best, timeMode);
@@ -832,7 +841,8 @@ function renderEditor(main, force){
       const reps = h('input',{type:'text', inputmode: timeMode ? 'numeric' : 'decimal', value:st.reps||'', placeholder: ph ? String(ph.reps||'') : (timeMode ? 'tid' : 'reps'), disabled:ro, 'aria-label':(timeMode?'Tid':'Reps')+' sæt '+(j+1),
         oninput:(ev)=>{ st.reps=ev.target.value; saveEdit(); updateProg(); },
         onblur: timeMode ? (ev)=>{ const f = fmtTime(ev.target.value); if (f !== ev.target.value){ ev.target.value = f; st.reps = f; saveEdit(0); updateProg(); } } : null});
-      const wt = h('input',{type:'text', inputmode:'decimal', value:st.weight||'', placeholder: ph ? String(ph.weight||'') : 'kg', disabled:ro, 'aria-label':'Vægt sæt '+(j+1), oninput:(ev)=>{ st.weight=ev.target.value; saveEdit(); updateProg(); }});
+      const wt = h('input',{type:'text', inputmode:'decimal', value:st.weight||'', placeholder: ph ? String(ph.weight||'') : (assist ? '-kg' : 'kg'), disabled:ro, 'aria-label':(assist?'Assistance':'Vægt')+' sæt '+(j+1),
+        oninput:(ev)=>{ let v = ev.target.value; if (assist){ const n = asNeg(v); if (n !== v){ ev.target.value = n; v = n; } } st.weight=v; saveEdit(); updateProg(); }});
       reps.addEventListener('keydown', ev => { if (ev.key==='Enter'){ ev.preventDefault(); wt.focus(); wt.select(); } });
       wt.addEventListener('keydown', ev => { if (ev.key==='Enter'){ ev.preventDefault(); const nxt = card.querySelectorAll('.setrow input')[(j+1)*2]; if (nxt){ nxt.focus(); nxt.select(); } else wt.blur(); } });
       setsEl.append(h('div',{class:'setrow'}, h('span',{class:'idx num'}, j+1), reps, h('span',{class:'x'},'×'), wt, h('span',{class:'unit'},'kg'),
@@ -841,13 +851,18 @@ function renderEditor(main, force){
     card.append(setsEl);
     setTimeout(updateProg, 0);
     const tools = h('div',{class:'tools'},
+      h('button',{class:'btn sm'+(assist?' on':''), disabled:ro, 'aria-pressed':assist?'true':'false', title:'Assisteret øvelse: vægten skrives som minus (fjerner kropsvægt)', onclick:()=>{
+        ex.assist = !assist; ex.sets.forEach(x => { if (String(x.weight||'').trim()){ const n = toNum(x.weight); if (n!=null) x.weight = ex.assist ? asNeg(String(Math.abs(n)).replace('.',',')) : String(Math.abs(n)).replace('.',','); } });
+        const px = programEx(ex.name); if (px && px.assist!==ex.assist){ px.assist = ex.assist; saveClient(S.cid, 0); } saveEdit(0); render(true); }}, assist ? '− kg ✓' : '− kg'),
       h('button',{class:'btn sm'+(timeMode?' on':''), disabled:ro, 'aria-pressed':timeMode?'true':'false', title:'Skriv tid i stedet for reps (tast f.eks. 130 for 1:30)', onclick:()=>{ ex.mode = timeMode ? 'reps' : 'time'; const day = (working().days||[]).find(d=>norm(d.name)===norm(s.dayName)); const px = day && (day.exercises||[]).find(x=>norm(x.name)===norm(ex.name)); if (px && px.mode!==ex.mode){ px.mode = ex.mode; saveClient(S.cid, 0); } saveEdit(0); render(true); }}, timeMode ? 'Tid ✓' : 'Tid'),
       h('button',{class:'btn sm', disabled:ro, onclick:()=>{ ex.sets.push({reps:'',weight:''}); saveEdit(0); render(true); setTimeout(()=>{ const ins=card.querySelectorAll('.setrow input'); const t=ins[ins.length-2]; if(t) t.focus(); },0); }}, '+ Sæt'),
       last ? h('button',{class:'btn sm', disabled:ro, onclick:()=>{ copyLast(ex, last); saveEdit(0); render(true); }}, 'Som sidst') : null,
-      h('button',{class:'btn sm ghost', disabled:ro, onclick:()=>{ card.querySelector('textarea').hidden = false; card.querySelector('textarea').focus(); }}, ex.note ? 'Ret note' : 'Note'),
+      ex.note ? null : h('button',{class:'btn sm ghost', disabled:ro, onclick:()=>{ const ta = card.querySelector('textarea'); ta.hidden = false; ta.focus(); }}, 'Note'),
       i < s.exercises.length-1 ? h('button',{class:'btn sm'+(ex.superset?' on':''), disabled:ro, 'aria-pressed':ex.superset?'true':'false', onclick:()=>{ ex.superset=!ex.superset; S.offers.push({ kind:'superset', newName: ex.name, value: ex.superset }); saveEdit(0); render(true); }}, ex.superset ? 'Superset ✓' : 'Superset') : null);
     card.append(tools);
-    card.append(h('textarea',{hidden:!ex.note, placeholder:'Note til øvelsen (teknik, smerte, indstilling …)', disabled:ro, 'aria-label':'Note', oninput:(ev)=>{ ex.note=ev.target.value; saveEdit(); }}, ex.note||''));
+    card.append(h('textarea',{class:'sticky', hidden:!ex.note, placeholder:'Note til øvelsen (teknik, indstilling, smerte …). Den vises hver gang.', disabled:ro, 'aria-label':'Fast note til øvelsen',
+      oninput:(ev)=>{ ex.note=ev.target.value; const px = programEx(ex.name); if (px){ px.note = ex.note; saveClient(S.cid, 800); } saveEdit(); }}, ex.note||''));
+    noteSlot.replaceWith(card.lastChild);
     return card;
   });
   for (const g of groupExercises(s.exercises)){
@@ -961,6 +976,7 @@ function renderProgram(main, force){
       row.append(h('div',{class:'pmeta'},
         h('span',null,'Sæt'),
         h('div',{class:'stepper'}, h('button',{disabled:ro, 'aria-label':'Færre sæt', onclick:()=>{ ex.sets=Math.max(1,(ex.sets||1)-1); n.textContent=ex.sets; saveClient(); }},'−'), n, h('button',{disabled:ro, 'aria-label':'Flere sæt', onclick:()=>{ ex.sets=(ex.sets||0)+1; n.textContent=ex.sets; saveClient(); }},'+')),
+        h('input',{value:ex.note||'', placeholder:'Fast note (vises hver træning)', disabled:ro, 'aria-label':'Fast note', style:'flex:1 1 100%;width:auto;text-align:left', oninput:(ev)=>{ ex.note=ev.target.value; saveClient(); }}),
         h('span',null,'Reps-mål'),
         h('input',{value:ex.reps||'', placeholder:'8-10', disabled:ro, 'aria-label':'Reps-mål', oninput:(ev)=>{ ex.reps=ev.target.value; saveClient(); }}),
         h('button',{class:'btn sm'+(ex.superset?' on':''), disabled:ro||ei===d.exercises.length-1, 'aria-pressed':ex.superset?'true':'false', title:'Superset med den næste øvelse', onclick:()=>{ ex.superset=!ex.superset; saveClient(); render(true); }}, ex.superset ? 'Superset ✓' : 'Superset')));
