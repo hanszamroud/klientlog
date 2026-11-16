@@ -1,0 +1,93 @@
+{
+ "app": "Klientlog",
+ "exportedAt": "2026-11-16T08:00:00.000Z",
+ "clients": [
+  {
+   "id": "skadet-fod",
+   "name": "Skadet fod",
+   "archived": false,
+   "days": [
+    {
+     "id": "d-skadetfod-a",
+     "name": "Fod + helkrop",
+     "exercises": [
+      {
+       "id": "e-sf0",
+       "name": "Seated Calf Raise",
+       "sets": 3,
+       "reps": "12-15",
+       "note": "Pain cap 2/10 i foden. Stop sættet hvis det stiger gennem sættet eller ændrer bevægelsen. Start let, 2-3 RIR. 2 sek pause i bund og top.",
+       "superset": true
+      },
+      {
+       "id": "e-sf1",
+       "name": "Single-Leg Balance",
+       "sets": 3,
+       "reps": "30 sek pr. ben",
+       "note": "Pain cap 2/10 i foden. Stop sættet hvis det stiger gennem sættet eller ændrer bevægelsen. Hold i ræk eller væg til at starte med. Progression: uden støtte, så blødt underlag.",
+       "superset": false
+      },
+      {
+       "id": "e-sf2",
+       "name": "Standing Calf Raise",
+       "sets": 3,
+       "reps": "10-12",
+       "note": "Begge ben, på gulvet først. Pain cap 2/10 i foden. Stop sættet hvis det stiger gennem sættet eller ændrer bevægelsen. 3 sek ned. Progression: fra step, så ét ben.",
+       "superset": false
+      },
+      {
+       "id": "e-sf3",
+       "name": "Leg Press",
+       "sets": 3,
+       "reps": "10-12",
+       "note": "Hele foden på pladen. 2 RIR. Pain cap 2/10 i foden.",
+       "superset": true
+      },
+      {
+       "id": "e-sf4",
+       "name": "Lat Pulldown",
+       "sets": 3,
+       "reps": "8-12",
+       "note": "2 RIR.",
+       "superset": false
+      },
+      {
+       "id": "e-sf5",
+       "name": "Hip Thrust",
+       "sets": 3,
+       "reps": "8-12",
+       "note": "Hælene i gulvet. 1-2 RIR. Pain cap 2/10 i foden.",
+       "superset": true
+      },
+      {
+       "id": "e-sf6",
+       "name": "Machine Chest Press",
+       "sets": 3,
+       "reps": "8-12",
+       "note": "1-2 RIR.",
+       "superset": false
+      },
+      {
+       "id": "e-sf7",
+       "name": "Seated Leg Curl",
+       "sets": 2,
+       "reps": "10-15",
+       "note": "1-2 RIR.",
+       "superset": true
+      },
+      {
+       "id": "e-sf8",
+       "name": "Seated Cable Row",
+       "sets": 3,
+       "reps": "10-12",
+       "note": "1-2 RIR.",
+       "superset": false
+      }
+     ]
+    }
+   ],
+   "last": null,
+   "sessions": []
+  }
+ ]
+}
