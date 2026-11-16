@@ -1172,6 +1172,27 @@ async function boot(){
     render();
   }, err => { clearTimeout(timer); S.clientsLoaded = true; console.error(err); toast('Kunne ikke hente klienter ('+(err&&err.code||'fejl')+')'); render(true); });
   if (S.cid) subscribeSessions(S.cid);
+  if (S.local) syncRepoPrograms();
+}
+// Henter nye programmer fra mappen programmer/ i repoet og lægger dem ind som klienter.
+// Hvert program lægges kun ind én gang, så omdøbning eller sletning i appen bliver ikke overskrevet.
+async function syncRepoPrograms(){
+  let seen = []; try { seen = JSON.parse(localStorage.getItem('klientlog-repo-programs')||'[]'); } catch(e){}
+  try {
+    const idx = await (await fetch('programmer/index.json?t='+Date.now(), {cache:'no-store'})).json();
+    let added = 0;
+    for (const f of (idx.files||[])){
+      if (seen.includes(f)) continue;
+      const json = await (await fetch('programmer/'+f+'?t='+Date.now(), {cache:'no-store'})).json();
+      for (const c of (json.clients||[])){
+        if (!c || !c.id || !c.name) continue;
+        const ex = await S.db.doc('clients/'+c.id).get();
+        if (!ex.exists){ await S.db.doc('clients/'+c.id).set({ name:c.name, archived:false, days:c.days||[], last:null, createdAt:new Date().toISOString(), order:String(c.name).toLowerCase(), importedWeeks:null }); added++; }
+      }
+      seen.push(f); try { localStorage.setItem('klientlog-repo-programs', JSON.stringify(seen)); } catch(e){}
+    }
+    if (added) toast(added===1 ? 'Nyt program er lagt ind' : added+' nye programmer er lagt ind');
+  } catch(e){ console.warn('Programmer kunne ikke hentes', e); }
 }
 boot();
 })();

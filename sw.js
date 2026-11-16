@@ -1,4 +1,4 @@
-const CACHE = 'klientlog-a087554b';
+const CACHE = 'klientlog-a087554c';
 const SHELL = ['./', './index.html', './local-db.js?v=a087554b', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -8,6 +8,7 @@ self.addEventListener('fetch', e => {
   const isShell = url.origin === location.origin;
   const isFont = /fonts\.(googleapis|gstatic)\.com$/.test(url.host);
   if (!isShell && !isFont) return;
+  if (isShell && url.pathname.includes('/programmer/')) return; // programmer hentes altid fra nettet
   if (isShell && (req.mode === 'navigate' || url.pathname.endsWith('/index.html') || url.pathname.endsWith('/'))) {
     // app shell: network first, so updates arrive; offline falls back to the cached copy
     e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return res; })
