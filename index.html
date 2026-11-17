@@ -581,7 +581,8 @@ function renderHome(main){
         ? h('div',{class:'row'}, h('button',{class:'btn sm', id:'expJson', onclick:()=>exportAll('json')},'Backup (JSON)'), h('button',{class:'btn sm', id:'expCsv', onclick:()=>exportAll('csv')},'Regneark (CSV)'),
             S.local ? h('label',{class:'btn sm', for:'impFile'}, 'Importér backup', h('input',{type:'file', id:'impFile', accept:'.json,application/json', hidden:true, onchange:(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if (f) importBackup(f); }})) : null)
         : h('div',{class:'small muted'},'Eksport er ikke tilgængelig i denne visning. Åbn appen på claude.ai og prøv igen.'),
-      h('div',{class:'small muted', id:'expStatus', style:'margin-top:8px'}, S.expStatus||''))
+      h('div',{class:'small muted', id:'expStatus', style:'margin-top:8px'}, S.expStatus||'')),
+    h('div',{class:'small muted', style:'text-align:center'}, 'Version 17.11b')
   ));
 }
 let exporting = false;
