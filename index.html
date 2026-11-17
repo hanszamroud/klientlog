@@ -430,15 +430,25 @@ async function flush(path){
   const q = queue.get(path); if(!q || q.inflight || !q.dirty) return;
   clearTimeout(q.timer); q.inflight = true; q.dirty = false;
   const op = q.op, data = q.data;
+  let ok = false;
   try {
     const ref = S.db.doc(path);
     if (op==='delete') await ref.delete(); else await ref.set(data);
-    if (!pendingAny()) setStatus('saved');
+    ok = true;
   } catch(e){
     const code = e && e.code;
     if (code==='unavailable' || code==='resource_exhausted'){ q.dirty = true; q.op = op; q.data = data; setTimeout(()=>flush(path), 1500+Math.random()*1500); }
     else { setStatus('error', e); if (code==='invalid_argument' && S.canWrite==null){ S.canWrite=false; toast('Kan ikke gemme: du har kun læseadgang'); } else toast('Kunne ikke gemme ('+(code||'fejl')+')'); }
-  } finally { q.inflight = false; if (q.dirty) flush(path); }
+  } finally {
+    q.inflight = false;
+    if (q.dirty) flush(path);
+    else if (ok){
+      // Den lokale database sender sin opdatering mens gemningen stadig er i gang, så klientlisten opdateres her
+      const m = /^clients\/([^/]+)$/.exec(path);
+      if (m && op==='set' && S.clients.has(m[1])){ S.clients.set(m[1], normClient(data)); render(); }
+      if (!pendingAny()) setStatus('saved');
+    }
+  }
 }
 function pendingAny(){ for (const q of queue.values()) if (q.dirty || q.inflight) return true; return false; }
 function pending(path){ const q = queue.get(path); return !!(q && (q.dirty || q.inflight)); }
