@@ -1,3 +1,6 @@
 {
- "files": ["skadet-fod.json"]
+ "files": [
+  "skadet-fod.json",
+  "fino.json"
+ ]
 }

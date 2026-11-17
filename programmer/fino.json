@@ -1,0 +1,101 @@
+{
+ "app": "Klientlog",
+ "exportedAt": "2026-11-17T08:00:00.000Z",
+ "clients": [
+  {
+   "id": "fino",
+   "name": "Fino",
+   "archived": false,
+   "days": [
+    {
+     "id": "d-fino-a",
+     "name": "Kondi + core + calisthenics",
+     "exercises": [
+      {
+       "id": "e-fino0",
+       "name": "Incline Push-Up",
+       "sets": 3,
+       "reps": "8-12",
+       "note": "Pain cap 3/10 i albue og skulder, også aftenen og morgenen efter. 2 RIR. Progression: lavere bænk, så Push-Up på gulvet.",
+       "superset": true
+      },
+      {
+       "id": "e-fino1",
+       "name": "Dead Bug",
+       "sets": 3,
+       "reps": "8 pr. side",
+       "note": "Lænd i gulvet hele vejen. Langsomt.",
+       "superset": false
+      },
+      {
+       "id": "e-fino2",
+       "name": "Inverted Row",
+       "sets": 3,
+       "reps": "8-12",
+       "note": "Pain cap 3/10 i albue og skulder, også aftenen og morgenen efter. 2 RIR. Progression: fødderne længere frem.",
+       "superset": true
+      },
+      {
+       "id": "e-fino3",
+       "name": "Side Plank",
+       "sets": 3,
+       "reps": "30 sek pr. side",
+       "note": "Progression: 45 sek, så løft det øverste ben.",
+       "superset": false
+      },
+      {
+       "id": "e-fino4",
+       "name": "Bulgarian Split Squat",
+       "sets": 3,
+       "reps": "8-10 pr. ben",
+       "note": "Kropsvægt først, så håndvægte. 2 RIR.",
+       "superset": true
+      },
+      {
+       "id": "e-fino5",
+       "name": "Hollow Body Hold",
+       "sets": 3,
+       "reps": "20-30 sek",
+       "note": "Bøjede knæ til at starte med. Stop når lænden løfter sig.",
+       "superset": false
+      },
+      {
+       "id": "e-fino6",
+       "name": "Dead Hang",
+       "sets": 3,
+       "reps": "20-30 sek",
+       "note": "Pain cap 3/10 i albue og skulder, også aftenen og morgenen efter. Fødderne må støtte let i starten. Progression mod 60 sek og Scapular Pull-Up.",
+       "superset": true
+      },
+      {
+       "id": "e-fino7",
+       "name": "Cossack Squat",
+       "sets": 2,
+       "reps": "6 pr. side",
+       "note": "Rolig bevægelse, gå så dybt det føles godt.",
+       "superset": false
+      },
+      {
+       "id": "e-fino8",
+       "name": "Bike Intervals",
+       "sets": 8,
+       "reps": "30 sek hårdt / 30 sek let",
+       "note": "Kondition. Hårdt = ca. 8/10. Progression: 10 runder, så 40/20.",
+       "superset": false
+      },
+      {
+       "id": "e-fino9",
+       "name": "Deep Squat Hold",
+       "sets": 2,
+       "reps": "45-60 sek",
+       "note": "Smidighed til sidst. Hold i noget hvis nødvendigt.",
+       "superset": false
+      }
+     ]
+    }
+   ],
+   "last": null,
+   "sessions": []
+  }
+ ]
+}
