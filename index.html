@@ -582,7 +582,7 @@ function renderHome(main){
             S.local ? h('label',{class:'btn sm', for:'impFile'}, 'Importér backup', h('input',{type:'file', id:'impFile', accept:'.json,application/json', hidden:true, onchange:(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=''; if (f) importBackup(f); }})) : null)
         : h('div',{class:'small muted'},'Eksport er ikke tilgængelig i denne visning. Åbn appen på claude.ai og prøv igen.'),
       h('div',{class:'small muted', id:'expStatus', style:'margin-top:8px'}, S.expStatus||'')),
-    h('div',{class:'small muted', style:'text-align:center'}, 'Version 17.11b')
+    h('div',{class:'small muted', style:'text-align:center'}, 'Version 17.11c')
   ));
 }
 let exporting = false;
@@ -661,8 +661,13 @@ function createClient(name){
 function clientMenu(){
   const c = client();
   const box = h('div',{class:'card stack'});
-  const rename = h('form',{class:'row', onsubmit:(ev)=>{ ev.preventDefault(); const v=$('#rename').value.trim(); if(!v) return; working().name=v; saveClient(S.cid,0); S.menu=false; render(true); }},
-    h('input',{id:'rename', class:'grow', value:c.name, 'aria-label':'Nyt navn'}), h('button',{class:'btn sm', type:'submit'},'Omdøb'));
+  // Navnet gemmes både når feltet forlades og ved Omdøb, så det virker selvom iPhone-tastaturet flytter knappen
+  const doRename = (inp, close)=>{ const v=String(inp.value||'').trim(); const w=working();
+    if (v && v!==w.name){ w.name=v; w.order=v.toLowerCase(); saveClient(S.cid,0); toast('Omdøbt til '+v); }
+    if (close){ S.menu=false; render(true); } else renderTop(); };
+  const nameInp = h('input',{id:'rename', class:'grow', value:c.name, 'aria-label':'Nyt navn', enterkeyhint:'done', autocomplete:'off', onchange:(ev)=>doRename(ev.target, false)});
+  const rename = h('form',{class:'row', onsubmit:(ev)=>{ ev.preventDefault(); doRename(nameInp, true); }},
+    nameInp, h('button',{class:'btn sm', type:'submit'},'Omdøb'));
   box.append(rename,
     h('div',{class:'row'},
       h('button',{class:'btn sm', onclick:()=>{ working().archived=!c.archived; saveClient(S.cid,0); S.menu=false; toast(c.archived?'Klienten er aktiv igen':'Klienten er arkiveret'); location.hash='home'; }}, c.archived ? 'Gendan klient' : 'Arkivér klient'),
